@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Granite Speech Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      color: #94a3b8;
+      margin-top: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #1e2330;
+      border: 1px solid #2d3348;
+      border-radius: 1rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1.2rem;
+    }
+
+    /* Language selector */
+    .lang-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .lang-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 1rem;
+      border-radius: 999px;
+      border: 1px solid #3a4060;
+      background: #252b3b;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.9rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .lang-chip input[type="checkbox"] {
+      accent-color: #60a5fa;
+      width: 15px;
+      height: 15px;
+    }
+
+    .lang-chip:has(input:checked) {
+      border-color: #60a5fa;
+      background: #1a2540;
+    }
+
+    .lang-chip.always-on {
+      border-color: #34d399;
+      background: #0d2b22;
+      cursor: default;
+      opacity: 0.85;
+    }
+
+    /* Record button */
+    .record-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    #record-btn {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s, box-shadow 0.2s, background 0.2s;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+      outline: none;
+    }
+
+    #record-btn:hover { transform: scale(1.05); }
+    #record-btn:active { transform: scale(0.97); }
+
+    #record-btn.recording {
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      animation: pulse 1.4s infinite;
+    }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.5); }
+      70%  { box-shadow: 0 0 0 18px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0); }
+    }
+
+    #record-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      animation: none;
+    }
+
+    #status-text {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      min-height: 1.2em;
+    }
+
+    #status-text.recording { color: #f87171; }
+    #status-text.processing { color: #fbbf24; }
+    #status-text.done { color: #34d399; }
+    #status-text.error { color: #f87171; }
+
+    /* Timer */
+    #timer {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.85rem;
+      color: #64748b;
+      min-height: 1.2em;
+    }
+
+    /* Results */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .result-box {
+      background: #252b3b;
+      border: 1px solid #2d3348;
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .result-box .lang-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #60a5fa;
+    }
+
+    .result-box .result-text {
+      font-size: 0.97rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 2.5em;
+    }
+
+    .result-box .result-text.placeholder {
+      color: #475569;
+      font-style: italic;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #334155;
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Waveform viz */
+    #waveform {
+      width: 100%;
+      height: 48px;
+      border-radius: 0.5rem;
+      background: #13171f;
+      display: none;
+    }
+
+    #waveform.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Granite Speech Demo</h1>
+    <p>IBM Granite Speech 4.1 &middot; Transcription &amp; Translation</p>
+  </header>
+
+  <!-- Language selector -->
+  <div class="card">
+    <h2>Output Languages</h2>
+    <div class="lang-grid">
+      <label class="lang-chip always-on" title="English is always included">
+        <input type="checkbox" checked disabled />
+        🇺🇸 English
+      </label>
+      <label class="lang-chip">
+        <input type="checkbox" value="german" id="lang-german" />
+        🇩🇪 German
+      </label>
+      <label class="lang-chip">
+        <input type="checkbox" value="french" id="lang-french" />
+        🇫🇷 French
+      </label>
+      <label class="lang-chip">
+        <input type="checkbox" value="spanish" id="lang-spanish" />
+        🇪🇸 Spanish
+      </label>
+    </div>
+  </div>
+
+  <!-- Record -->
+  <div class="card">
+    <h2>Record Audio</h2>
+    <div class="record-section">
+      <canvas id="waveform"></canvas>
+      <button id="record-btn" title="Start recording">🎙️</button>
+      <div id="status-text">Click the button to start recording</div>
+      <div id="timer"></div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="card" id="results-card" style="display:none">
+    <h2>Results</h2>
+    <div class="results-grid" id="results-grid"></div>
+  </div>
+
+  <script>
+    const recordBtn = document.getElementById('record-btn');
+    const statusText = document.getElementById('status-text');
+    const timerEl = document.getElementById('timer');
+    const resultsCard = document.getElementById('results-card');
+    const resultsGrid = document.getElementById('results-grid');
+    const waveformCanvas = document.getElementById('waveform');
+    const waveCtx = waveformCanvas.getContext('2d');
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let timerInterval = null;
+    let startTime = null;
+    let animFrameId = null;
+    let analyser = null;
+    let audioCtx = null;
+
+    function getSelectedLanguages() {
+      const checked = document.querySelectorAll('.lang-grid input[type="checkbox"]:not(:disabled):checked');
+      const langs = ['english'];
+      checked.forEach(cb => { if (!langs.includes(cb.value)) langs.push(cb.value); });
+      return langs;
+    }
+
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000);
+      const m = Math.floor(s / 60);
+      return `${String(m).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+    }
+
+    function setStatus(msg, cls = '') {
+      statusText.textContent = msg;
+      statusText.className = cls;
+    }
+
+    function startTimer() {
+      startTime = Date.now();
+      timerEl.textContent = '00:00';
+      timerInterval = setInterval(() => {
+        timerEl.textContent = formatTime(Date.now() - startTime);
+      }, 500);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerEl.textContent = '';
+    }
+
+    // Waveform visualisation
+    function drawWaveform() {
+      if (!analyser) return;
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteTimeDomainData(buf);
+
+      const w = waveformCanvas.width;
+      const h = waveformCanvas.height;
+      waveCtx.clearRect(0, 0, w, h);
+      waveCtx.lineWidth = 2;
+      waveCtx.strokeStyle = '#60a5fa';
+      waveCtx.beginPath();
+
+      const step = w / buf.length;
+      buf.forEach((v, i) => {
+        const x = i * step;
+        const y = (v / 128) * (h / 2);
+        i === 0 ? waveCtx.moveTo(x, y) : waveCtx.lineTo(x, y);
+      });
+      waveCtx.stroke();
+      animFrameId = requestAnimationFrame(drawWaveform);
+    }
+
+    function resizeWaveform() {
+      waveformCanvas.width = waveformCanvas.offsetWidth;
+      waveformCanvas.height = waveformCanvas.offsetHeight;
+    }
+
+    async function startRecording() {
+      audioChunks = [];
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (e) {
+        setStatus('Microphone access denied.', 'error');
+        return;
+      }
+
+      // Set up analyser
+      audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+
+      waveformCanvas.classList.add('active');
+      resizeWaveform();
+      drawWaveform();
+
+      // Prefer webm/opus, fall back to whatever is available
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', '']
+        .find(m => m === '' || MediaRecorder.isTypeSupported(m));
+
+      mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => handleRecordingDone(stream);
+      mediaRecorder.start(100);
+
+      recordBtn.classList.add('recording');
+      recordBtn.textContent = '⏹️';
+      recordBtn.title = 'Stop recording';
+      setStatus('Recording…', 'recording');
+      startTimer();
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      stopTimer();
+      cancelAnimationFrame(animFrameId);
+      waveformCanvas.classList.remove('active');
+      if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
+    }
+
+    async function handleRecordingDone(stream) {
+      stream.getTracks().forEach(t => t.stop());
+      recordBtn.classList.remove('recording');
+      recordBtn.textContent = '🎙️';
+      recordBtn.title = 'Start recording';
+      recordBtn.disabled = true;
+
+      if (audioChunks.length === 0) {
+        setStatus('No audio captured.', 'error');
+        recordBtn.disabled = false;
+        return;
+      }
+
+      setStatus('Processing…', 'processing');
+
+      const mimeType = audioChunks[0].type || 'audio/webm';
+      const blob = new Blob(audioChunks, { type: mimeType });
+      const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
+
+      const languages = getSelectedLanguages();
+
+      // Show placeholder results while waiting
+      showPlaceholders(languages);
+
+      const formData = new FormData();
+      formData.append('audio', blob, `recording.${ext}`);
+      formData.append('languages', languages.join(','));
+
+      try {
+        const resp = await fetch('/transcribe', { method: 'POST', body: formData });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+          throw new Error(err.detail || resp.statusText);
+        }
+        const data = await resp.json();
+        showResults(data.results);
+        setStatus('Done!', 'done');
+      } catch (e) {
+        setStatus(`Error: ${e.message}`, 'error');
+        clearResults();
+      } finally {
+        recordBtn.disabled = false;
+      }
+    }
+
+    function langLabel(lang) {
+      const flags = { english: '🇺🇸', german: '🇩🇪', french: '🇫🇷', spanish: '🇪🇸' };
+      const names = { english: 'English', german: 'German', french: 'French', spanish: 'Spanish' };
+      return `${flags[lang] ?? ''} ${names[lang] ?? lang}`;
+    }
+
+    function showPlaceholders(languages) {
+      resultsCard.style.display = '';
+      resultsGrid.innerHTML = '';
+      languages.forEach(lang => {
+        const box = document.createElement('div');
+        box.className = 'result-box';
+        box.id = `result-${lang}`;
+        box.innerHTML = `
+          <div class="lang-label">${langLabel(lang)}</div>
+          <div class="result-text placeholder"><span class="spinner"></span>Processing…</div>
+        `;
+        resultsGrid.appendChild(box);
+      });
+    }
+
+    function showResults(results) {
+      Object.entries(results).forEach(([lang, text]) => {
+        const box = document.getElementById(`result-${lang}`);
+        if (box) {
+          const textEl = box.querySelector('.result-text');
+          textEl.classList.remove('placeholder');
+          textEl.textContent = text || '(empty)';
+        }
+      });
+      // Clear any leftover placeholders that didn't get filled
+      document.querySelectorAll('.result-text.placeholder').forEach(el => {
+        el.textContent = '(no result)';
+        el.classList.remove('placeholder');
+      });
+    }
+
+    function clearResults() {
+      resultsCard.style.display = 'none';
+      resultsGrid.innerHTML = '';
+    }
+
+    recordBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (waveformCanvas.classList.contains('active')) resizeWaveform();
+    });
+  </script>
+</body>
+</html>
